@@ -1,15 +1,15 @@
-<title>Texting Your typing skills</title>
+<title>Text de tipeo  ⌨️</title>
 <style>
-    :root {
-        color-scheme: light dark;
-        --green: #00b755;
+  :root {
+    color-scheme: light dark;
+    --green: #00b755;
     --yellow: #daaf38;
     --red: #ca4754;
     --black: #222;
     --gray: #999;
-    }
+  }
 
-body  {
+  body {
     background: var(--black);
     font-family: Menlo, monospace;
     display: grid;
@@ -19,15 +19,352 @@ body  {
     padding: 16px;
   }
 
+  section {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-width: 500px;
+  }
 
+  time {
+    color: var(--yellow)
+  }
+
+  input {
+    z-index: -999;
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  p {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px 8px;
+    margin: 0;
+  }
+
+  letter {
+    color: var(--gray);
+    position: relative;
+
+    &.active::before {
+      content: '|';
+      color: var(--yellow);
+      font-size: 14px;
+      position: absolute;
+      left: -65%;
+      animation: 1s blink infinite ease-in-out;
+    }
+
+    &.active.is-last::before {
+      left: 65%;
+    }
+
+    &.correct {
+      color: var(--green);
+    }
+
+    &.incorrect {
+      color: var(--red);
+    }
+  }
+
+  word {
+    border-bottom: 1.5px solid transparent;
+    transition: border-color 0.3s ease-in-out;
+
+    &.marked {
+      border-color: var(--red);
+    }
+  }
+
+  @keyframes blink {
+
+    0%,
+    25% {
+      opacity: 1;
+    }
+
+    75% {
+      opacity: 0;
+    }
+  }
+
+  #game {
+    display: flex;
+  }
+
+  #results {
+    display: none;
+  }
+
+  h2 {
+    font-weight: 400;
+    opacity: .4;
+    margin: 0;
+    font-size: 16px;
+  }
+
+  h3 {
+    font-weight: 400;
+    margin: 0;
+    font-size: 24px;
+    color: var(--yellow);
+  }
+
+  button {
+    background: transparent;
+    border: 0;
+    margin-top: 32px;
+    padding: 8px;
+    opacity: .4;
+    display: inline-block;
+    transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+    cursor: pointer;
+    border-radius: 16px;
+
+    &:hover {
+      background: #444;
+      opacity: 1;
+      scale: 110%;
+    }
+  }
 </style>
+
 <body>
-    <main>
-        <section id="game">
-            <time>30</time>
-            <paragraph> </paragraph>
-            <input autofocus>
-        </section>
-    
-    </main>
+  <main>
+    <section id="game">
+      <!-- Sección del juego donde se muestra el tiempo y el párrafo para escribir -->
+      <time></time>
+      <p></p>
+      <input autofocus>
+    </section>
+    <section id="results">
+      <!-- Sección de resultados que se muestra al finalizar el juego -->
+      <h2>Palabras Por Minuto</h2>
+      <h3 id="results-wpm"></h3>
+
+      <h2>Exactitud</h2>
+      <h3 id="results-accuracy"></h3>
+
+      <button id="reload-button">
+        <!-- Botón para reiniciar el juego -->
+        <!-- SVG para el icono de reinicio -->
+      </button>
+    </section>
+  </main>
 </body>
+<script type="module">
+  // Importación de módulo para las palabras iniciales del juego
+  import { words as INITIAL_WORDS } from './data.js'
+
+  // Variables globales y selección de elementos del DOM
+  const $time = document.querySelector('time');
+  const $paragraph = document.querySelector('p');
+  const $input = document.querySelector('input');
+  const $game = document.querySelector('#game')
+  const $results = document.querySelector('#results')
+  const $wpm = $results.querySelector('#results-wpm')
+  const $accuracy = $results.querySelector('#results-accuracy')
+  const $button = document.querySelector('#reload-button')
+
+  // Tiempo inicial en segundos
+  const INITIAL_TIME = 3;
+
+  // Variables para el juego
+  let words = []
+  let currentTime = INITIAL_TIME
+  let playing
+
+  // Inicialización del juego y eventos
+  initGame()
+  initEvents()
+
+  // Función para inicializar el juego
+  function initGame() {
+    $game.style.display = 'flex'
+    $results.style.display = 'none'
+    $input.value = ''
+
+    playing = false
+
+    // Obtener palabras aleatorias para el juego
+    words = INITIAL_WORDS.toSorted(
+      () => Math.random() - 0.5
+    ).slice(0, 50)
+    currentTime = INITIAL_TIME
+
+    $time.textContent = currentTime
+
+    // Mostrar las palabras en el párrafo con letras individuales
+    $paragraph.innerHTML = words.map((word, index) => {
+      const letters = word.split('')
+
+      return `<word>
+        ${letters
+          .map(letter => `<letter>${letter}</letter>`)
+          .join('')
+        }
+      </word>
+      `
+    }).join('')
+
+    // Configurar la primera palabra y letra como activa
+    const $firstWord = $paragraph.querySelector('word')
+    $firstWord.classList.add('active')
+    $firstWord.querySelector('letter').classList.add('active')
+  }
+
+  // Función para inicializar eventos (teclado y reinicio)
+  function initEvents() {
+    // Enfocar el input al cargar la página y empezar el juego
+    document.addEventListener('keydown', () => {
+      $input.focus()
+      if (!playing) {
+        playing = true
+        // Iniciar el conteo regresivo del tiempo
+        const intervalId = setInterval(() => {
+          currentTime--
+          $time.textContent = currentTime
+
+          // Finalizar el juego cuando se acaba el tiempo
+          if (currentTime === 0) {
+            clearInterval(intervalId)
+            gameOver()
+          }
+        }, 1000)
+      }
+    })
+
+    // Eventos de teclado para manejar la escritura
+    $input.addEventListener('keydown', onKeyDown)
+    $input.addEventListener('keyup', onKeyUp)
+
+    // Evento para reiniciar el juego al hacer clic en el botón de reinicio
+    $button.addEventListener('click', initGame)
+  }
+
+  // Función para manejar eventos de teclado (escritura y retroceso)
+  function onKeyDown(event) {
+    const $currentWord = $paragraph.querySelector('word.active')
+    const $currentLetter = $currentWord.querySelector('letter.active')
+
+    const { key } = event
+    if (key === ' ') {
+      event.preventDefault()
+
+      // Avanzar a la siguiente palabra y marcar la actual como correcta o incorrecta
+      const $nextWord = $currentWord.nextElementSibling
+      const $nextLetter = $nextWord.querySelector('letter')
+
+      $currentWord.classList.remove('active', 'marked')
+      $currentLetter.classList.remove('active')
+
+      $nextWord.classList.add('active')
+      $nextLetter.classList.add('active')
+
+      $input.value = ''
+
+      const hasMissedLetters = $currentWord
+        .querySelectorAll('letter:not(.correct)').length > 0
+
+      const classToAdd = hasMissedLetters ? 'marked' : 'correct'
+      $currentWord.classList.add(classToAdd)
+
+      return
+    }
+
+    if (key === 'Backspace') {
+      const $prevWord = $currentWord.previousElementSibling
+      const $prevLetter = $currentLetter.previousElementSibling
+
+      if (!$prevWord && !$prevLetter) {
+        event.preventDefault()
+        return
+      }
+
+      // Manejar el retroceso entre palabras marcadas
+      const $wordMarked = $paragraph.querySelector('word.marked')
+      if ($wordMarked && !$prevLetter) {
+        event.preventDefault()
+        $prevWord.classList.remove('marked')
+        $prevWord.classList.add('active')
+
+        const $letterToGo = $prevWord.querySelector('letter:last-child')
+
+        $currentLetter.classList.remove('active')
+        $letterToGo.classList.add('active')
+
+        $input.value = [
+          ...$prevWord.querySelectorAll('letter.correct, letter.incorrect')
+        ].map($el => {
+          return $el.classList.contains('correct') ? $el.innerText : '*'
+        })
+          .join('')
+      }
+    }
+  }
+
+  // Función para manejar eventos de soltar tecla (validación de letras escritas)
+  function onKeyUp() {
+    const $currentWord = $paragraph.querySelector('word.active')
+    const $currentLetter = $currentWord.querySelector('letter.active')
+
+    // Obtener la palabra actual y configurar la longitud máxima del input
+    const currentWord = $currentWord.innerText.trim()
+    $input.maxLength = currentWord.length
+
+    // Remover clases de letras activas y incorrectas
+    const $allLetters = $currentWord.querySelectorAll('letter')
+    $allLetters.forEach($letter => $letter.classList.remove('correct', 'incorrect'))
+
+    // Comparar las letras escritas con las de la palabra actual
+    $input.value.split('').forEach((char, index) => {
+      const $letter = $allLetters[index]
+      const letterToCheck = currentWord[index]
+
+      const isCorrect = char === letterToCheck
+      const letterClass = isCorrect ? 'correct' : 'incorrect'
+      $letter.classList.add(letterClass)
+    })
+
+    // Manejar la activación de la siguiente letra activa
+    $currentLetter.classList.remove('active', 'is-last')
+    const inputLength = $input.value.length
+    const $nextActiveLetter = $allLetters[inputLength]
+
+    if ($nextActiveLetter) {
+      $nextActiveLetter.classList.add('active')
+    } else {
+      $currentLetter.classList.add('active', 'is-last')
+      // TODO: Lógica para finalizar el juego si no hay más palabras por escribir
+    }
+  }
+
+  // Función para finalizar el juego y mostrar resultados
+  function gameOver() {
+    $game.style.display = 'none'
+    $results.style.display = 'flex'
+
+    // Calcular palabras y letras correctas e incorrectas
+    const correctWords = $paragraph.querySelectorAll('word.correct').length
+    const correctLetter = $paragraph.querySelectorAll('letter.correct').length
+    const incorrectLetter = $paragraph.querySelectorAll('letter.incorrect').length
+
+    const totalLetters = correctLetter + incorrectLetter
+
+    // Calcular precisión y palabras por minuto (wpm)
+    const accuracy = totalLetters > 0
+      ? (correctLetter / totalLetters) * 100
+      : 0
+
+    const wpm = correctWords * 60 / INITIAL_TIME
+    $wpm.textContent = wpm
+    $accuracy.textContent = `${accuracy.toFixed(2)}%`
+  }
+</script>
+</html>
